@@ -1,11 +1,12 @@
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
-public class GameLogic implements PlayableLogic
-{
-    private  Player firstPlayer;
-    private Player secondPlayer;
+public class GameLogic implements PlayableLogic {
+    private Player firstPlayer = new HumanPlayer(true);
+    private Player secondPlayer = new HumanPlayer(false);
     private Disc[][] board;
+
 
     public GameLogic()
     {
@@ -13,113 +14,140 @@ public class GameLogic implements PlayableLogic
 
 
     }
+    public GameLogic(Player firstPlayer , Player secondPlayer)
+    {
+        this.firstPlayer = firstPlayer;
+        this.secondPlayer = secondPlayer;
+    }
 
-    private Move placeDisc(Position position, Disc disc) {
+    private void switchTurns() {
+        getFirstPlayer().isPlayerOne = !getFirstPlayer().isPlayerOne;
+    }
+
+    public Move placeDisc(Position position, Disc disc) {
         int row = position.row();
         int col = position.col();
 
-        if(!isValidMove(row, col)) return null;
+        if (!isValidMove(row, col))
+            return null;
+
+        Player player = isFirstPlayerTurn() ? getFirstPlayer() : getSecondPlayer();
+
+        if (disc instanceof BombDisc)
+        {
+            if (player.getNumber_of_bombs() > 0 )
+                player.reduce_bomb();
+
+            else
+                return null;
+        }
+
+        if (disc instanceof UnflippableDisc)
+        {
+
+            if ( player.getNumber_of_unflippedable() > 0)
+                player.reduce_unflippedable();
+
+            else
+                return null;
+
+        }
 
         board[row][col] = disc;
 
+        if (player.equals(getFirstPlayer()))
+            System.out.println("Player 1 placed a " + disc.getType() + " in (" + row + "," + col + ")");
+
+        else
+            System.out.println("Player 2 placed a " + disc.getType() + " in (" + row + "," + col + ")");
+
         List<Disc> discsToFlip = flippableDiscsAt(position);
 
-        for (int i = 0; i < 8 ; i++)
-        {
-            for (int j = 0; j < 8  ; j++)
-            {
-                if (discsToFlip.contains(board[i][j]))
-                    flipDisc(board[i][j], new Position(i,j));
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+
+                if (discsToFlip.contains(board[i][j])) {
+                    flipDiscs(board[i][j], new Position(i, j));
+
+                    if (player.equals(getFirstPlayer()))
+                        System.out.println("Player 1 flipped the " + board[i][j].getType() + " in (" + i + "," + j + ")");
+
+                    else
+                        System.out.println("Player 2 flipped the " + board[i][j].getType() + " in (" + i + "," + j + ")");
+                }
             }
         }
 
-        Player player = isFirstPlayerTurn() ? getFirstPlayer() : getSecondPlayer();
-        return new Move(player, position, disc, discsToFlip);
+
+        Move move = new Move(player, position, disc, discsToFlip);
+
+        Move.getTracker().add(move);
+
+        System.out.println();
+
+        switchTurns();
+
+        return move;
     }
 
-    private void flipDisc(Disc disc, Position discPos) {
+    private void flipDiscs(Disc disc, Position position) {
         Player player = isFirstPlayerTurn() ? getFirstPlayer() : getSecondPlayer();
 
-        if (disc.getType().equals("⬤"))
-            disc.setOwner(player);
+        int row = position.row();
+        int col = position.col();
 
-        if (disc.getType().equals("💣")){
-            disc.setOwner(player);
-            int row = discPos.row();
-            int col = discPos.col();
 
-            if (isWithinBounds(row, col + 1) && !board[row][col + 1].getType().equals("⭕")) {
-                if (board[row][col + 1].getType().equals("💣"))
-                    flipDisc(board[row][col + 1], new Position(row, col + 1));
-                if (board[row][col + 1].getOwner().equals(getFirstPlayer()))
-                    board[row][col + 1].setOwner(getSecondPlayer());
-                else
-                    board[row][col + 1].setOwner(getFirstPlayer());
-            }
+        if (!isWithinBounds(row, col) || board[row][col] == null) {
+            return;
+        }
 
-            if (isWithinBounds(row + 1, col)&& !board[row + 1][col].getType().equals("⭕")) {
-                if (board[row + 1][col].getType().equals("💣"))
-                    flipDisc(board[row + 1][col], new Position(row + 1, col));
-                if (board[row + 1][col].getOwner().equals(getFirstPlayer()))
-                    board[row + 1][col].setOwner(getSecondPlayer());
-                else
-                    board[row + 1][col].setOwner(getFirstPlayer());
-            }
 
-            if (isWithinBounds(row + 1, col + 1) && !board[row + 1][col + 1].getType().equals("⭕")) {
-                if (board[row + 1][col + 1].getType().equals("💣"))
-                    flipDisc(board[row + 1][col + 1], new Position(row + 1, col + 1));
-                if (board[row + 1][col + 1].getOwner().equals(getFirstPlayer()))
-                    board[row + 1][col + 1].setOwner(getSecondPlayer());
-                else
-                    board[row + 1][col + 1].setOwner(getFirstPlayer());
-            }
+        disc.setOwner(player);
 
-            if (isWithinBounds(row, col - 1) && !board[row][col - 1].getType().equals("⭕")) {
-                if (board[row][col - 1].getType().equals("💣"))
-                    flipDisc(board[row][col - 1], new Position(row, col - 1));
-                if (board[row][col - 1].getOwner().equals(getFirstPlayer()))
-                    board[row][col - 1].setOwner(getSecondPlayer());
-                else
-                    board[row][col - 1].setOwner(getFirstPlayer());
-            }
 
-            if (isWithinBounds(row - 1, col) && !board[row - 1][col].getType().equals("⭕")) {
-                if (board[row - 1][col].getType().equals("💣"))
-                    flipDisc(board[row - 1][col], new Position(row - 1, col));
-                if (board[row - 1][col].getOwner().equals(getFirstPlayer()))
-                    board[row - 1][col].setOwner(getSecondPlayer());
-                else
-                    board[row - 1][col].setOwner(getFirstPlayer());
-            }
+        if (disc instanceof BombDisc) {
+            triggerExplosion(row, col, player);
+        }
+    }
 
-            if (isWithinBounds(row + 1, col - 1) && !board[row + 1][col - 1].getType().equals("⭕")) {
-                if (board[row + 1][col - 1].getType().equals("💣"))
-                    flipDisc(board[row + 1][col - 1], new Position(row + 1, col - 1));
-                if (board[row + 1][col - 1].getOwner().equals(getFirstPlayer()))
-                    board[row + 1][col - 1].setOwner(getSecondPlayer());
-                else
-                    board[row + 1][col - 1].setOwner(getFirstPlayer());
-            }
+    private void triggerExplosion(int row, int col, Player player) {
+        Disc disc = board[row][col];
 
-            if (isWithinBounds(row - 1, col + 1) && !board[row - 1][col + 1].getType().equals("⭕")) {
-                if (board[row - 1][col + 1].getType().equals("💣"))
-                    flipDisc(board[row - 1][col + 1], new Position(row - 1, col + 1));
-                if (board[row - 1][col + 1].getOwner().equals(getFirstPlayer()))
-                    board[row - 1][col + 1].setOwner(getSecondPlayer());
-                else
-                    board[row - 1][col + 1].setOwner(getFirstPlayer());
-            }
+        int[] rowDirections = {-1, -1, -1, 0, 1, 1, 1, 0};
+        int[] colDirections = {-1, 0, 1, 1, 1, 0, -1, -1};
 
-            if (isWithinBounds(row - 1, col - 1) && !board[row - 1][col - 1].getType().equals("⭕")) {
-                if (board[row - 1][col - 1].getType().equals("💣"))
-                    flipDisc(board[row - 1][col - 1], new Position(row - 1, col - 1));
-                if (board[row - 1][col - 1].getOwner().equals(getFirstPlayer()))
-                    board[row - 1][col - 1].setOwner(getSecondPlayer());
-                else
-                    board[row - 1][col - 1].setOwner(getFirstPlayer());
+        // Recursively call flipDiscs on all 8 adjacent cells
+        for (int i = 0; i < 8; i++) {
+            int newRow = row + rowDirections[i];
+            int newCol = col + colDirections[i];
+            flipDiscs(disc, new Position(newRow, newCol));
+        }
+    }
+
+    private List<Disc> counterExplosions(int row, int col, Player player) {
+        List<Disc> explodedDiscs = new ArrayList<>();
+        Disc disc = board[row][col];
+
+        int[] rowDirections = {-1, -1, -1, 0, 1, 1, 1, 0};
+        int[] colDirections = {-1, 0, 1, 1, 1, 0, -1, -1};
+
+        for (int i = 0; i < 8; i++) {
+            int newRow = row + rowDirections[i];
+            int newCol = col + colDirections[i];
+
+            if (isWithinBounds(newRow, newCol)) {
+                Disc adjacentDisc = board[newRow][newCol];
+
+                if (adjacentDisc != null) {
+                    explodedDiscs.add(disc);
+                }
+
+                if (adjacentDisc instanceof BombDisc) {
+                    explodedDiscs.addAll(counterExplosions(newRow, newCol, player));
+                }
             }
         }
+        return explodedDiscs;
     }
 
     private List<Disc> flippableDiscsAt(Position position) {
@@ -136,153 +164,186 @@ public class GameLogic implements PlayableLogic
         //row check for "sandwich"    B W W B
 
         for (int j = col; j < 8 && isOpponentDiscRight; j++) {
-            if (board[row][j].getOwner().equals(player))
+
+            if (board[row][j] != null && board[row][j].getOwner().equals(player))
                 isOpponentDiscRight = false;
-            else if (!board[row][j].getType().equals("⭕"))
+
+            else if (board[row][j] != null && !board[row][j].getType().equals("⭕"))
                 flippableDiscs.add(board[row][j]);
+
+
+            if (board[row][j] instanceof BombDisc)
+                flippableDiscs.addAll(counterExplosions(row, j, player));
+
+
         }
 
 
         boolean isOpponentDiscLeft = true;
 
         for (int j = col; j >= 0 && isOpponentDiscLeft; j--) {
-            if (board[row][j].getOwner().equals(player))
+
+            if (board[row][j] != null && board[row][j].getOwner().equals(player))
                 isOpponentDiscLeft = false;
-            else if (!board[row][j].getType().equals("⭕"))
+
+
+            else if (board[row][j] != null && !board[row][j].getType().equals("⭕"))
                 flippableDiscs.add(board[row][j]);
+
+
+            if (board[row][j] instanceof BombDisc)
+                flippableDiscs.addAll(counterExplosions(row, j, player));
         }
 
 
         boolean isOpponentTop = true;
 
         for (int i = row; i >= 0 && isOpponentTop; i--) {
-            if (board[i][col].getOwner().equals(player))
+
+            if (board[i][col] != null &&  board[i][col].getOwner().equals(player))
                 isOpponentTop = false;
-            else if (!board[i][col].getType().equals("⭕"))
+
+            else if (board[i][col] != null && !board[i][col].getType().equals("⭕"))
                 flippableDiscs.add(board[i][col]);
+
+            if (board[i][col] instanceof BombDisc)
+                flippableDiscs.addAll(counterExplosions(i, col, player));
         }
 
 
         boolean isOpponentBottom = true;
 
         for (int i = row; i < 8 && isOpponentBottom; i++) {
-            if (board[i][col].getOwner().equals(player))
+
+            if (board[i][col]!= null && board[i][col].getOwner().equals(player))
                 isOpponentBottom = false;
-            else if (!board[i][col].getType().equals("⭕"))
+
+            else if (board[i][col]!= null && !board[i][col].getType().equals("⭕"))
                 flippableDiscs.add(board[i][col]);
+
+            if (board[i][col] instanceof BombDisc)
+                flippableDiscs.addAll(counterExplosions(i, col, player));
         }
 
 
         boolean diaganolRightTop = true;
 
         for (int i = row, j = col; i >= 0 && j < 8 && diaganolRightTop; i--, j++) {
-            if (board[i][j].getOwner().equals(player))
+
+            if (board[i][j] != null && board[i][j].getOwner().equals(player))
                 diaganolRightTop = false;
-            else if (!board[i][j].getType().equals("⭕"))
+
+            else if (board[i][j] != null && !board[i][j].getType().equals("⭕"))
                 flippableDiscs.add(board[i][j]);
+
+            if (board[i][j] instanceof BombDisc)
+                flippableDiscs.addAll(counterExplosions(i, j, player));
         }
 
 
         boolean diaganolLeftBottom = true;
 
         for (int i = row, j = col; i < 8 && j >= 0 && diaganolLeftBottom; i++, j--) {
-            if (board[i][j].getOwner().equals(player))
+
+
+            if (board[i][j] != null && board[i][j].getOwner().equals(player))
                 diaganolLeftBottom = false;
-            else if (!board[i][j].getType().equals("⭕"))
+
+
+            else if (board[i][j] != null && !board[i][j].getType().equals("⭕"))
                 flippableDiscs.add(board[i][j]);
+
+            if (board[i][j] instanceof BombDisc)
+                flippableDiscs.addAll(counterExplosions(i, j, player));
         }
 
 
         boolean diaganolLeftTop = true;
 
         for (int i = row, j = col; i >= 0 && j >= 0 && diaganolLeftTop; i--, j--) {
-            if (board[i][j].getOwner().equals(player))
+
+            if (board[i][j] != null && board[i][j].getOwner().equals(player))
                 diaganolLeftTop = false;
-            else if (!board[i][j].getType().equals("⭕"))
+
+            else if (board[i][j] != null && board[i][j].getType().equals("⭕"))
                 flippableDiscs.add(board[i][j]);
+
+            if (board[i][j] instanceof BombDisc)
+                flippableDiscs.addAll(counterExplosions(i, j, player));
         }
 
 
         boolean diaganolRightBottom = true;
 
         for (int i = row, j = col; i < 8 && j < 8 && diaganolRightBottom; i++, j++) {
-            if (board[i][j].getOwner().equals(player))
+
+            if (board[i][j]!= null && board[i][j].getOwner().equals(player))
                 diaganolRightBottom = false;
-            else if (!board[i][j].getType().equals("⭕"))
+
+            else if (board[i][j]!= null && !board[i][j].getType().equals("⭕"))
                 flippableDiscs.add(board[i][j]);
+
+            if (board[i][j] instanceof BombDisc)
+                flippableDiscs.addAll(counterExplosions(i, j, player));
+
         }
 
         return flippableDiscs;
     }
 
-    private boolean isWithinBounds(Position a)
-    {
+    private boolean isWithinBounds(Position a) {
         int row = a.row();
-        int col = a.row();
+        int col = a.col();
 
-        return row >=0 && row < 8 && col >= 0 && col < 8;
+        return row >= 0 && row < 8 && col >= 0 && col < 8;
     }
 
-    private boolean isWithinBounds(int row, int col)
-    {
-        return row >=0 && row < 8 && col >= 0 && col < 8;
+    private boolean isWithinBounds(int row, int col) {
+        return row >= 0 && row < 8 && col >= 0 && col < 8;
     }
 
     @Override
     public boolean locate_disc(Position a, Disc disc) {
-        if(!isWithinBounds(a))
-            return false;
-
-
-        int row = a.row();
-        int col = a.col();
-
-
-        return  board[row][col] != null && board[row][col].equals(disc) ;
+        return placeDisc(a, disc) != null;
     }
 
     @Override
-    public Disc getDiscAtPosition(Position position)
-    {
-      int row = position.row();
-      int col = position.col();
+    public Disc getDiscAtPosition(Position position) {
+        int row = position.row();
+        int col = position.col();
 
-      if(!isWithinBounds(position))
-          return null;
+        if (!isWithinBounds(position))
+            return null;
 
-      return board[row][col];
+        return board[row][col];
 
 
     }
 
     @Override
     public int getBoardSize() {
-        return 8*8;
+        return 8;
     }
 
     @Override
-    public List<Position> ValidMoves()
-    {
+    public List<Position> ValidMoves() {
 
         List<Position> move = new ArrayList<>();
 
-        for (int i = 0; i < 8 ; i++)
-        {
-            for (int j = 0; j < 8  ; j++)
-            {
-             if(isValidMove(i, j))
-                 move.add(new Position(i,j));
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (isValidMove(i, j))
+                    move.add(new Position(i, j));
             }
         }
 
         return move;
     }
 
-    private boolean isValidMove(int rowIndex, int colIndex)
-    {
+    private boolean isValidMove(int rowIndex, int colIndex) {
         Player player = isFirstPlayerTurn() ? getFirstPlayer() : getSecondPlayer();
 
-        if(board[rowIndex][colIndex] != null)
+        if (board[rowIndex][colIndex] != null)
             return false;
 
 
@@ -290,106 +351,94 @@ public class GameLogic implements PlayableLogic
 
         //row check for "sandwich"    B W W B
 
-        for (int j = colIndex; j < 8 && isOpponentDiscRight; j++)
-        {
-            if (board[rowIndex][j].getOwner().equals(player))
+        for (int j = colIndex; j < 8 && isOpponentDiscRight; j++) {
+            if (board[rowIndex][j] != null && board[rowIndex][j].getOwner().equals(player))
                 isOpponentDiscRight = false;
         }
 
-        if(!isOpponentDiscRight)
+        if (!isOpponentDiscRight)
             return true;
 
 
+        boolean isOpponentDiscLeft = true;
 
-       boolean  isOpponentDiscLeft = true;
-
-       for (int j = colIndex ; j >= 0 && isOpponentDiscLeft; j--)
-       {
-           if (board[rowIndex][j].getOwner().equals(player))
-               isOpponentDiscLeft = false;
-       }
-
-       if(!isOpponentDiscLeft)
-           return true;
-
-;
-       boolean isOpponentTop = true;
-
-       for (int i = rowIndex; i >= 0 && isOpponentTop ; i--)
-       {
-         if (board[i][colIndex].getOwner().equals(player))
-             isOpponentTop = false;
+        for (int j = colIndex; j >= 0 && isOpponentDiscLeft; j--) {
+            if (board[rowIndex][j] != null && board[rowIndex][j].getOwner().equals(player))
+                isOpponentDiscLeft = false;
         }
 
-       if (!isOpponentTop)
-           return true;
+        if (!isOpponentDiscLeft)
+            return true;
 
+        ;
+        boolean isOpponentTop = true;
 
-       boolean isOpponentBottom = true;
-
-       for (int i = rowIndex; i < 8 && isOpponentBottom ; i++)
-       {
-           if(board[i][colIndex].getOwner().equals(player))
-               isOpponentBottom = false;
+        for (int i = rowIndex; i >= 0 && isOpponentTop; i--) {
+            if (board[i][colIndex] != null && board[i][colIndex].getOwner().equals(player))
+                isOpponentTop = false;
         }
 
-       if (!isOpponentBottom)
-           return true;
+        if (!isOpponentTop)
+            return true;
 
 
-       boolean diaganolRightTop = true;
+        boolean isOpponentBottom = true;
 
-       for (int i = rowIndex , j = colIndex; i >= 0 && j < 8 && diaganolRightTop; i-- , j++)
-       {
-           if(board[i][j].getOwner().equals(player))
-               diaganolRightTop = false;
+        for (int i = rowIndex; i < 8 && isOpponentBottom; i++) {
+            if (board[i][colIndex] != null && board[i][colIndex].getOwner().equals(player))
+                isOpponentBottom = false;
         }
 
-       if(!diaganolRightTop)
-           return true;
+        if (!isOpponentBottom)
+            return true;
 
 
-       boolean diaganolLeftBottom = true;
+        boolean diaganolRightTop = true;
 
-       for (int i = rowIndex , j = colIndex; i < 8 && j >= 0 && diaganolLeftBottom; i++ , j--)
-       {
-           if (board[i][j].getOwner().equals(player))
-               diaganolLeftBottom = false;
-       }
+        for (int i = rowIndex, j = colIndex; i >= 0 && j < 8 && diaganolRightTop; i--, j++) {
+            if (board[i][j] != null && board[i][j].getOwner().equals(player))
+                diaganolRightTop = false;
+        }
 
-       if(!diaganolLeftBottom)
-           return true;
-
-
-       boolean diaganolLeftTop = true;
-
-       for (int i = rowIndex , j = colIndex; i >=0 && j >= 0 && diaganolLeftTop; i-- , j--)
-       {
-           if (board[i][j].getOwner().equals(player))
-               diaganolLeftTop = false;
-       }
-
-       if(!diaganolLeftTop)
-           return true;
+        if (!diaganolRightTop)
+            return true;
 
 
-       boolean diaganolRightBottom = true;
+        boolean diaganolLeftBottom = true;
 
-       for (int i = rowIndex , j = colIndex; i < 8 && j < 8 && diaganolRightBottom; i++ , j++)
-       {
-           if (board[i][j].getOwner().equals(player))
-               diaganolRightBottom = false;
-       }
+        for (int i = rowIndex, j = colIndex; i < 8 && j >= 0 && diaganolLeftBottom; i++, j--) {
+            if (board[i][j] != null && board[i][j].getOwner().equals(player))
+                diaganolLeftBottom = false;
+        }
 
-       if(!diaganolRightBottom)
-           return true;
+        if (!diaganolLeftBottom)
+            return true;
 
-       return false;
+
+        boolean diaganolLeftTop = true;
+
+        for (int i = rowIndex, j = colIndex; i >= 0 && j >= 0 && diaganolLeftTop; i--, j--) {
+            if (board[i][j] != null && board[i][j].getOwner().equals(player))
+                diaganolLeftTop = false;
+        }
+
+        if (!diaganolLeftTop)
+            return true;
+
+
+        boolean diaganolRightBottom = true;
+
+        for (int i = rowIndex, j = colIndex; i < 8 && j < 8 && diaganolRightBottom; i++, j++) {
+            if (board[i][j] != null && board[i][j].getOwner().equals(player))
+                diaganolRightBottom = false;
+        }
+
+        return !diaganolRightBottom;
     }
 
     @Override
     public int countFlips(Position a) {
-        return 0;
+        return flippableDiscsAt(a).size();
     }
 
     @Override
@@ -399,36 +448,117 @@ public class GameLogic implements PlayableLogic
 
     @Override
     public Player getSecondPlayer() {
-       return secondPlayer;
+        return secondPlayer;
     }
 
     @Override
-    public void setPlayers(Player player1, Player player2)
-    {
+    public void setPlayers(Player player1, Player player2) {
         this.firstPlayer = player1;
         this.secondPlayer = player2;
     }
 
     @Override
-    public boolean isFirstPlayerTurn()
-    {
-        return firstPlayer.isPlayerOne;
+    public boolean isFirstPlayerTurn() {
+        return firstPlayer.isPlayerOne();
     }
 
     @Override
     public boolean isGameFinished() {
-        return false;
+        return ValidMoves().isEmpty();
+    }
+
+    private Player theWinnerIs(){
+        int firstPlayerCounter = 0, secondPlayerCounter = 0;
+
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (board[i][j] != null) {
+
+                    if (board[i][j].getOwner().equals(getFirstPlayer()))
+                        firstPlayerCounter++;
+
+                    else
+                        secondPlayerCounter++;
+                }
+            }
+        }
+
+        if (firstPlayerCounter > secondPlayerCounter) {
+            System.out.println("Player 1 wins with " + firstPlayerCounter + " discs! Player 2 had " + secondPlayerCounter + " discs.");
+            return getFirstPlayer();
+        }
+
+        else if (firstPlayerCounter < secondPlayerCounter) {
+            System.out.println("Player 2 wins with " + secondPlayerCounter + " discs! Player 1 had " + firstPlayerCounter + " discs.");
+            return getSecondPlayer();
+        }
+
+        else
+            return null;
     }
 
     @Override
     public void reset() {
         board = new Disc[8][8];
+        Player winner = theWinnerIs();
+
+        if (winner != null)
+            winner.addWin();
+
+        getFirstPlayer().reset_bombs_and_unflippedable();
+        getSecondPlayer().reset_bombs_and_unflippedable();
+
+        int midRow = board.length / 2;
+        int midCol = board[0].length / 2;
+
+        board[midRow - 1][midCol - 1] = new SimpleDisc(getSecondPlayer());
+        board[midRow - 1][midCol] = new SimpleDisc(getFirstPlayer());
+        board[midRow][midCol - 1] = new SimpleDisc(getFirstPlayer());
+        board[midRow][midCol] = new SimpleDisc(getSecondPlayer());
+
     }
 
     @Override
-    public void undoLastMove()
-    {
+    public void undoLastMove() {
+        if (Move.getTracker().isEmpty()) {
+            System.out.println("No previous move available to undo.");
+            return;
+        }
 
+        if (!getFirstPlayer().isHuman() || !getSecondPlayer().isHuman())
+            return;
+
+        System.out.println("Undoing last move:");
+
+
+        Move temp = Move.getTracker().pop();
+        int row = temp.position().row();
+        int col = temp.position().col();
+
+        System.out.println("Undo: removing " + temp.disc().getType() + " from (" + row + "," + col + ")");
+
+        board[row][col] = null;
+
+        List<Disc> modified = temp.getWereFlipped();
+
+        for (Disc disc : modified) {
+            if (disc.getOwner().equals(getFirstPlayer()))
+                disc.setOwner((getSecondPlayer()));
+            else
+                disc.setOwner(getFirstPlayer());
+
+            boolean found = false;
+            for (int i = 0; i < 8 && !found; i++) {
+                for (int j = 0; j < 8 && !found; j++) {
+                    if (board[i][j] == disc) {
+                        System.out.println("Undo: flipping back " + disc.getType() + " in (" + i + ", " + j + ")");
+                        found = true;
+                    }
+                }
+            }
+        }
+
+        System.out.println();
     }
 
 }

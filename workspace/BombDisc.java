@@ -1,5 +1,7 @@
 public class BombDisc extends AbstractDisc
 {
+
+
     public BombDisc(Player owner)
     {
         super(owner);
